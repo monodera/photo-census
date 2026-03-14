@@ -1,0 +1,12 @@
+[project]
+name = "photos-count-daily"
+version = "0.1.0"
+description = "Count macOS Photos library photos grouped by date"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "osxphotos>=0.75.5",
+]
+
+[project.scripts]
+photos-count-daily = "photos_count_daily:main"
