@@ -9,23 +9,12 @@ macOS の Photos ライブラリを読み込み、日付ごとに写真枚数を
 
 ## 実行方法
 
-### スクリプトを直接実行（推奨）
-
 `uv` がインストールされていれば、`uv sync` 不要でそのまま実行できます。
 
 ```bash
 git clone https://github.com/monodera/photos-by-date.git
 cd photos-by-date
 uv run photos_count_daily.py
-```
-
-### `uv sync` 後にコマンドとして実行
-
-```bash
-git clone https://github.com/monodera/photos-by-date.git
-cd photos-by-date
-uv sync
-uv run photos-count-daily
 ```
 
 ## オプション
