@@ -1,0 +1,51 @@
+name: PhotosCountDaily
+options:
+  bundleIdPrefix: com.monodera
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+targets:
+  PhotosCountDaily:
+    type: application
+    platform: macOS
+    sources:
+      - Sources
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "14.0"
+        LSApplicationCategoryType: public.app-category.photography
+        NSPhotoLibraryUsageDescription: "Reads your Photos library to count photos and total size per day."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.monodera.PhotosCountDaily
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+  PhotosCountDailyTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests
+      - path: Sources/Models.swift
+        optional: true
+      - path: Sources/Formatters.swift
+        optional: true
+      - path: Sources/DailyAggregator.swift
+        optional: true
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  PhotosCountDaily:
+    build:
+      targets:
+        PhotosCountDaily: all
+        PhotosCountDailyTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - PhotosCountDailyTests
