@@ -12,6 +12,7 @@ Count photos grouped by date and display sorted results.
 
 import argparse
 from collections import Counter
+import os
 import sys
 
 try:
@@ -31,6 +32,19 @@ def format_date(dt):
     return dt.strftime("%Y-%m-%d")
 
 
+def format_size(num_bytes):
+    """Format bytes as human-readable string (decimal units, matching Finder)."""
+    if num_bytes < 1000:
+        return f"{num_bytes} B"
+    size = num_bytes
+    for unit in ("KB", "MB", "GB"):
+        size /= 1000
+        # 999.95+ would render as "1000.0", so roll over to the next unit
+        if round(size, 1) < 1000:
+            return f"{size:.1f} {unit}"
+    return f"{size / 1000:.1f} TB"
+
+
 def count_photos_by_date(library_path=None, raw_only=False, debug=False, debug_date=None, photos_only=False, date_field="date", diagnose_tz=False):
     """
     Count photos by date from macOS Photos library.
@@ -45,7 +59,8 @@ def count_photos_by_date(library_path=None, raw_only=False, debug=False, debug_d
         diagnose_tz: If True, report photos with missing timezone data that may be on wrong date.
 
     Returns:
-        Counter object with date strings as keys and photo counts as values.
+        Tuple of two Counter objects keyed by date string:
+        (photo counts, total original file sizes in bytes).
     """
     print("Loading Photos library...", file=sys.stderr)
 
@@ -60,16 +75,26 @@ def count_photos_by_date(library_path=None, raw_only=False, debug=False, debug_d
     else:
         all_photos = photosdb.photos()
 
-    # Exclude hidden photos (not shown in Photos.app library view)
-    all_photos = [p for p in all_photos if not p.hidden]
+    # Exclude photos not shown in Photos.app library view:
+    # - hidden photos
+    # - shared iCloud album photos (in DB but not in library)
+    # - syndicated ("Shared with You") photos not saved to library
+    all_photos = [
+        p for p in all_photos
+        if not p.hidden
+        and not p.shared
+        and not (p.syndicated and not p.saved_to_library)
+    ]
     print(f"Found {len(all_photos)} photos", file=sys.stderr)
 
     date_counter = Counter()
+    size_counter = Counter()
     filtered_count = 0
+    missing_raw_count = 0
 
     for photo in all_photos:
         # Filter for RAW images if requested
-        if raw_only and not photo.has_raw:
+        if raw_only and not (photo.israw or photo.has_raw):
             continue
 
         filtered_count += 1
@@ -109,6 +134,16 @@ def count_photos_by_date(library_path=None, raw_only=False, debug=False, debug_d
             print(f"  isphoto: {photo.isphoto}, ismovie: {photo.ismovie}", file=sys.stderr)
 
         date_counter[date_str] += 1
+        size_counter[date_str] += photo.original_filesize or 0
+
+        # Include the RAW component of RAW+JPEG pairs; its size is not in the
+        # DB metadata, so read it from the local file (unavailable if the RAW
+        # is not downloaded from iCloud)
+        if photo.has_raw:
+            try:
+                size_counter[date_str] += os.path.getsize(photo.path_raw)
+            except (TypeError, OSError):
+                missing_raw_count += 1
 
         # Timezone diagnosis
         if diagnose_tz and photo.date is not None:
@@ -134,7 +169,14 @@ def count_photos_by_date(library_path=None, raw_only=False, debug=False, debug_d
     if raw_only:
         print(f"Filtered to {filtered_count} RAW images", file=sys.stderr)
 
-    return date_counter
+    if missing_raw_count:
+        print(
+            f"Warning: {missing_raw_count} RAW files not available locally; "
+            "their sizes are not included in the totals",
+            file=sys.stderr,
+        )
+
+    return date_counter, size_counter
 
 
 def main():
@@ -143,9 +185,9 @@ def main():
     )
     parser.add_argument(
         "-s", "--sort",
-        choices=["count", "date"],
+        choices=["count", "date", "size"],
         default="count",
-        help="Sort by count (default) or date"
+        help="Sort by count (default), date, or total file size"
     )
     parser.add_argument(
         "-r", "--reverse",
@@ -200,24 +242,26 @@ def main():
     args = parser.parse_args()
 
     try:
-        date_counter = count_photos_by_date(args.library, args.raw_only, args.debug, args.debug_date, args.photos_only, args.date_field, args.diagnose_tz)
+        date_counter, size_counter = count_photos_by_date(args.library, args.raw_only, args.debug, args.debug_date, args.photos_only, args.date_field, args.diagnose_tz)
     except Exception as e:
         print(f"Error loading Photos library: {e}", file=sys.stderr)
         sys.exit(1)
 
+    # Combine into (date, count, size) items
+    items = [(d, c, size_counter[d]) for d, c in date_counter.items()]
+
     # Sort results
     if args.sort == "count":
         # Sort by count (descending by default)
-        sorted_items = sorted(
-            date_counter.items(),
-            key=lambda x: x[1],
-            reverse=not args.reverse
-        )
+        sorted_items = sorted(items, key=lambda x: x[1], reverse=not args.reverse)
+    elif args.sort == "size":
+        # Sort by total file size (descending by default)
+        sorted_items = sorted(items, key=lambda x: x[2], reverse=not args.reverse)
     else:
         # Sort by date (descending by default - newest first)
         # Put "Unknown" dates always at the end regardless of sort direction
-        known_items = [(k, v) for k, v in date_counter.items() if k != "Unknown"]
-        unknown_items = [(k, v) for k, v in date_counter.items() if k == "Unknown"]
+        known_items = [it for it in items if it[0] != "Unknown"]
+        unknown_items = [it for it in items if it[0] == "Unknown"]
         known_sorted = sorted(known_items, key=lambda x: x[0], reverse=not args.reverse)
         sorted_items = known_sorted + unknown_items
 
@@ -226,16 +270,17 @@ def main():
         sorted_items = sorted_items[:args.top]
 
     # Print results
-    print("\n{:<12} {:>6}".format("Date", "Count"))
-    print("-" * 20)
+    print("\n{:<12} {:>6} {:>10}".format("Date", "Count", "Size"))
+    print("-" * 30)
 
-    for date_str, count in sorted_items:
-        print(f"{date_str:<12} {count:>6}")
+    for date_str, count, size in sorted_items:
+        print(f"{date_str:<12} {count:>6} {format_size(size):>10}")
 
-    print("-" * 20)
+    print("-" * 30)
     total_photos = sum(date_counter.values())
+    total_size = sum(size_counter.values())
     total_days = len(date_counter)
-    print(f"Total: {total_photos} photos across {total_days} days")
+    print(f"Total: {total_photos} photos, {format_size(total_size)} across {total_days} days")
 
 
 if __name__ == "__main__":
