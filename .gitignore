@@ -1,14 +1,17 @@
-# Python-generated files
+# Python (legacy CLI)
 __pycache__/
-*.py[oc]
+.venv/
+
+# Xcode / XcodeGen
+*.xcodeproj
 build/
-dist/
-wheels/
-*.egg-info
+DerivedData/
 
-# Virtual environments
-.venv
+# macOS
+.DS_Store
 
-# Claude Code
-.claude/
-CLAUDE.md
+# Release artifacts
+*.dmg
+
+# SDD scratch
+.superpowers/
