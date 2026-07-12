@@ -2,6 +2,12 @@ import Foundation
 import Observation
 import Photos
 
+enum MediaFilter: String, CaseIterable {
+    case all = "All"
+    case photosOnly = "Photos only"
+    case rawOnly = "RAW only"
+}
+
 @MainActor
 @Observable
 final class LibraryStatsViewModel {
@@ -13,8 +19,7 @@ final class LibraryStatsViewModel {
     }
 
     var state: LoadState = .idle
-    var photosOnly = false { didSet { recompute() } }
-    var rawOnly = false { didSet { recompute() } }
+    var filter: MediaFilter = .all { didSet { recompute() } }
     var sortField: StatSortField = .count { didSet { resort() } }
     var sortAscending = false { didSet { resort() } }
     private(set) var result: AggregationResult = .empty
@@ -40,7 +45,11 @@ final class LibraryStatsViewModel {
     }
 
     private func recompute() {
-        result = DailyAggregator.aggregate(records, photosOnly: photosOnly, rawOnly: rawOnly)
+        result = DailyAggregator.aggregate(
+            records,
+            photosOnly: filter == .photosOnly,
+            rawOnly: filter == .rawOnly
+        )
         resort()
     }
 

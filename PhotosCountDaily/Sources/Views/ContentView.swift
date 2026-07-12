@@ -54,8 +54,12 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItemGroup {
-                Toggle("Photos only", isOn: $viewModel.photosOnly)
-                Toggle("RAW only", isOn: $viewModel.rawOnly)
+                Picker("Filter", selection: $viewModel.filter) {
+                    ForEach(MediaFilter.allCases, id: \.self) { filter in
+                        Text(filter.rawValue).tag(filter)
+                    }
+                }
+                .pickerStyle(.menu)
                 Picker("Display", selection: $display) {
                     ForEach(DisplayMode.allCases, id: \.self) { mode in
                         Text(mode.rawValue).tag(mode)
@@ -67,8 +71,8 @@ struct ContentView: View {
         .sheet(item: $selectedDay, onDismiss: { tableSelection = nil }) { day in
             DayDetailView(
                 stat: day,
-                photosOnly: viewModel.photosOnly,
-                rawOnly: viewModel.rawOnly
+                photosOnly: viewModel.filter == .photosOnly,
+                rawOnly: viewModel.filter == .rawOnly
             )
         }
     }
