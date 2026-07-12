@@ -28,12 +28,9 @@ targets:
     platform: macOS
     sources:
       - Tests
-      - path: Sources/Models.swift
-        optional: true
-      - path: Sources/Formatters.swift
-        optional: true
-      - path: Sources/DailyAggregator.swift
-        optional: true
+      - Sources/Models.swift
+      - Sources/Formatters.swift
+      - Sources/DailyAggregator.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

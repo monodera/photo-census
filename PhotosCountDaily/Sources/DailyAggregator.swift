@@ -1,1 +1,1 @@
-// Placeholder for DailyAggregator (Task 3)
+// Placeholder — replaced by the real aggregator in a later task.

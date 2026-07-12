@@ -1,1 +1,1 @@
-// Placeholder for Formatters (Task 3)
+// Placeholder — replaced by the real formatters in a later task.

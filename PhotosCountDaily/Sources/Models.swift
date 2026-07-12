@@ -1,1 +1,1 @@
-// Placeholder for Models (Task 3)
+// Placeholder — replaced by the real models in a later task.
