@@ -103,8 +103,11 @@ struct AssetThumbnailView: View {
                 contentMode: .aspectFill,
                 options: options
             ) { result, _ in
+                // PhotoKit はメインスレッドでの呼び出しを保証しないため明示的にホップする
                 if let result {
-                    image = result
+                    Task { @MainActor in
+                        image = result
+                    }
                 }
             }
         }
