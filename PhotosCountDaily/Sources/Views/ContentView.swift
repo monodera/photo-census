@@ -47,7 +47,7 @@ struct ContentView: View {
                     selectedDay: $selectedDay
                 )
             case .chart:
-                ChartView(stats: viewModel.sortedStats)
+                ChartView(stats: viewModel.sortedStats, selectedDay: $selectedDay)
             }
             Divider()
             summaryBar
