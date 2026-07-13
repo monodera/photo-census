@@ -9,7 +9,7 @@ enum PhotoLibraryService {
 
     /// ユーザーライブラリの全資産を AssetRecord に変換する。
     /// リソース列挙が資産ごとに DB を叩くため大規模ライブラリでは時間がかかる。
-    /// progress は 500 件ごとと最終件で呼ばれる。
+    /// progress は約 30Hz に間引いて呼ばれる（最終件は必ず呼ぶ）。
     static func loadRecords(
         progress: @escaping @Sendable (Int, Int) -> Void
     ) async -> [AssetRecord] {
@@ -22,9 +22,13 @@ enum PhotoLibraryService {
             var records: [AssetRecord] = []
             records.reserveCapacity(total)
 
+            var lastReport = Date.distantPast
             fetchResult.enumerateObjects { asset, index, _ in
                 records.append(record(from: asset))
-                if (index + 1) % 500 == 0 || index == total - 1 {
+                // 毎アイテム進捗を刻みつつ、UI 更新は約 30Hz に間引く
+                let now = Date()
+                if now.timeIntervalSince(lastReport) >= 1.0 / 30.0 || index == total - 1 {
+                    lastReport = now
                     progress(index + 1, total)
                 }
             }

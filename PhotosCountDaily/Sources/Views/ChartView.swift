@@ -89,7 +89,7 @@ struct ChartView: View {
         case size = "Size"
     }
 
-    private let pointsPerDay: CGFloat = 8
+    private let pointsPerDay: CGFloat = 12
     private let axisWidth: CGFloat = 64
 
     init(stats: [DailyStat], selectedDay: Binding<DailyStat?>) {
@@ -151,7 +151,9 @@ struct ChartView: View {
                             .frame(width: chartWidth, height: geometry.size.height)
                             .background(
                                 ScrollOffsetReader { offset in
-                                    scrollOffset = offset
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        scrollOffset = offset
+                                    }
                                 }
                             )
                     }
@@ -174,13 +176,20 @@ struct ChartView: View {
             BarMark(
                 x: .value("Date", stat.date!, unit: .day),
                 y: .value(metric.rawValue, value(of: stat)),
-                width: .fixed(6)
+                width: .fixed(9)
             )
         }
         .chartYScale(domain: 0...visibleYMax)
         .chartYAxis {
             AxisMarks { _ in
                 AxisGridLine()
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: .stride(by: .month)) { _ in
+                AxisGridLine()
+                AxisTick()
+                AxisValueLabel(format: .dateTime.year().month(.abbreviated))
             }
         }
         .chartOverlay { proxy in
@@ -200,6 +209,11 @@ struct ChartView: View {
         }
         .chartYScale(domain: 0...visibleYMax)
         .chartXAxis(.hidden)
+        .chartYAxisLabel(position: .top, alignment: .leading) {
+            if metric == .count {
+                Text("items")
+            }
+        }
         .chartYAxis {
             AxisMarks(position: .leading) { value in
                 AxisValueLabel {
