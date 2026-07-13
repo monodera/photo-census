@@ -91,6 +91,7 @@ struct ChartView: View {
 
     private let pointsPerDay: CGFloat = 12
     private let axisWidth: CGFloat = 64
+    private let barWidth: CGFloat = 9
 
     init(stats: [DailyStat], selectedDay: Binding<DailyStat?>) {
         let filtered = stats.filter { $0.date != nil }.sorted { $0.day < $1.day }
@@ -172,7 +173,7 @@ struct ChartView: View {
             BarMark(
                 x: .value("Date", stat.date!, unit: .day),
                 y: .value(metric.rawValue, value(of: stat)),
-                width: .fixed(9)
+                width: .fixed(barWidth)
             )
         }
         .chartYScale(domain: 0...visibleYMax)
@@ -192,6 +193,7 @@ struct ChartView: View {
             ChartInteractionOverlay(
                 statsByDay: statsByDay,
                 chartWidth: chartWidth,
+                barWidth: barWidth,
                 proxy: proxy,
                 selectedDay: $selectedDay
             )
@@ -231,6 +233,7 @@ struct ChartView: View {
 private struct ChartInteractionOverlay: View {
     let statsByDay: [Date: DailyStat]
     let chartWidth: CGFloat
+    let barWidth: CGFloat
     let proxy: ChartProxy
     @Binding var selectedDay: DailyStat?
 
@@ -243,25 +246,48 @@ private struct ChartInteractionOverlay: View {
 
     var body: some View {
         GeometryReader { geo in
+            ZStack(alignment: .topLeading) {
+                highlightBand(geo: geo)
+
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active(let location):
+                            hovered = hoverInfo(at: location, geo: geo)
+                        case .ended:
+                            hovered = nil
+                        }
+                    }
+                    .onTapGesture { location in
+                        if let info = hoverInfo(at: location, geo: geo) {
+                            selectedDay = info.stat
+                        }
+                    }
+
+                tooltip
+            }
+        }
+    }
+
+    /// ホバー中の日のバー位置に重ねる薄いハイライト。BarMark 本体を再評価
+    /// せずに済むよう、proxy 経由でピクセル座標だけ求めて別レイヤーとして描く
+    @ViewBuilder
+    private func highlightBand(geo: GeometryProxy) -> some View {
+        if let hovered,
+           let date = hovered.stat.date,
+           let plotFrame = proxy.plotFrame,
+           // BarMark は unit: .day で 1 日分のバンドの中央に描かれるため、
+           // 日付そのもの（0時）ではなく正午の位置を問い合わせてバンド中央に合わせる
+           let dayMidpoint = Calendar.current.date(byAdding: .hour, value: 12, to: date),
+           let xPos = proxy.position(forX: dayMidpoint) {
+            let frame = geo[plotFrame]
             Rectangle()
-                .fill(Color.clear)
-                .contentShape(Rectangle())
-                .onContinuousHover { phase in
-                    switch phase {
-                    case .active(let location):
-                        hovered = hoverInfo(at: location, geo: geo)
-                    case .ended:
-                        hovered = nil
-                    }
-                }
-                .onTapGesture { location in
-                    if let info = hoverInfo(at: location, geo: geo) {
-                        selectedDay = info.stat
-                    }
-                }
-                .overlay(alignment: .topLeading) {
-                    tooltip
-                }
+                .fill(Color.accentColor.opacity(0.15))
+                .frame(width: barWidth + 4, height: frame.height)
+                .position(x: frame.origin.x + xPos, y: frame.origin.y + frame.height / 2)
+                .allowsHitTesting(false)
         }
     }
 
