@@ -1,8 +1,8 @@
 # photos-count-daily
 
 > **Note:** This is the legacy Python CLI. The repository now ships a native
-> macOS app, PhotoCensus — see the [top-level README](../README.md). The CLI
-> still works as documented below.
+> macOS app, PhotoCensus — see the [top-level README](../README_en.md). The
+> CLI still works as documented below.
 
 A script that reads a macOS Photos library and counts the number of photos per day.
 

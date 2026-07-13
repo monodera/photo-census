@@ -1,6 +1,6 @@
 # photos-count-daily
 
-> **注:** これはレガシーの Python CLI 版です。現在このリポジトリはネイティブ macOS アプリ **PhotoCensus** を提供しています — [トップレベルの README](../README_ja.md) を参照してください。CLI は以下のとおり引き続き動作します。
+> **注:** これはレガシーの Python CLI 版です。現在このリポジトリはネイティブ macOS アプリ **PhotoCensus** を提供しています — [トップレベルの README](../README.md) を参照してください。CLI は以下のとおり引き続き動作します。
 
 macOS の Photos ライブラリを読み込み、日付ごとに写真枚数をカウントして表示するスクリプト。
 
