@@ -78,3 +78,7 @@ PhotoCensus.app を Applications にドラッグする。
     git tag v0.1.0 && git push origin v0.1.0
 
 GitHub Actions が dmg をビルドしてリリースに添付する。
+
+## ライセンス
+
+[MIT License](LICENSE)

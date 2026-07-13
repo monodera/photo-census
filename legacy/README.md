@@ -88,3 +88,7 @@ The goal is to count the photos that appear in the Photos.app library view; the 
 - **Burst photos**: Only key photos and user-selected photos from reviewed bursts are counted. Auto-selected photos from unreviewed bursts are not included.
 - **Size**: Sum of original file sizes (plus the RAW component for RAW+JPEG pairs). RAW sizes cannot be included when the RAW file has not been downloaded from iCloud (a warning is printed to stderr). Edited derivative files are not included.
 - **iCloud sync in progress**: Photo counts may be temporarily inaccurate depending on the timing of script execution while the library is syncing.
+
+## License
+
+[MIT License](../LICENSE)

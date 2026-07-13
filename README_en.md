@@ -77,3 +77,7 @@ functional. See [legacy/README.md](legacy/README.md).
     git tag v0.1.0 && git push origin v0.1.0
 
 GitHub Actions builds the dmg and attaches it to the release.
+
+## License
+
+[MIT License](LICENSE)
