@@ -1,85 +1,77 @@
 # photos_count_daily
 
-macOS の Photos ライブラリを読み込み、日付ごとに写真枚数をカウントして表示するスクリプト。
+macOS Photos ライブラリの日別写真枚数・容量を表示するネイティブ macOS アプリ
+PhotoCensus（SwiftUI + PhotoKit）。旧 Python CLI は `legacy/` にある。
 
-## 実行方法
+## リポジトリ構成
 
-Python の実行には `uv` を使う。
+- `PhotoCensus/` — SwiftUI アプリ本体（XcodeGen 管理）
+  - `project.yml` — XcodeGen 設定。`.xcodeproj` は git 管理外で毎回生成する
+  - `Sources/` — Swift ソース
+  - `Tests/` — XCTest（ロジックのみ。PhotoKit に触れるテストは書かない）
+- `legacy/` — 旧 Python CLI（osxphotos ベース、`uv` で実行）。詳細は `legacy/README.md`
+- `assets/icon/` — アプリアイコンの SVG ソースと生成スクリプト（`gen_icon.py`）
+- `scripts/make_dmg.sh` — Release ビルド + ad-hoc 署名 + dmg 作成
+- `.github/workflows/release.yml` — タグ `v*` push で dmg を GitHub Release に添付
 
-```bash
-# 依存関係のインストール
-uv sync
-
-# スクリプトの実行
-uv run python photos_count_daily.py [オプション]
-```
-
-## コマンドラインオプション
-
-| オプション | 説明 |
-| --------- | ---- |
-| `-s {count\|date\|size}` | カウント順（デフォルト）、日付順、または合計容量順でソート |
-| `-r` | ソート順を逆にする |
-| `-n N` | 上位 N 件のみ表示 |
-| `--library PATH` | カスタム Photos ライブラリのパスを指定（省略時はシステムデフォルト） |
-| `--raw-only` | RAW 画像のみをカウント（RAW 単体および RAW+JPEG ペア） |
-| `--photos-only` | 動画を除外して写真のみをカウント |
-| `--debug` | 最初の5枚の写真のデバッグ情報を表示 |
-| `--debug-date YYYY-MM-DD` | 指定日付の全写真を表示（デバッグ用） |
-| `--diagnose-tz` | タイムゾーン情報のない写真（日付ズレの可能性あり）を報告（診断用） |
-| `--date-field {date\|date_original\|date_added}` | グループ化に使う日付フィールド（デフォルト: `date`） |
-
-`--date-field` の各値：
-
-- `date` — Photos.app が表示する撮影日（ユーザーによる日付編集が反映される）
-- `date_original` — インポート時の EXIF 撮影日（ユーザー編集前の元の日付）
-- `date_added` — Photos ライブラリへの追加日（インポート日）
-
-### 実行例
+## ビルド・テスト
 
 ```bash
-# 枚数の多い日付順にトップ10を表示
-uv run python photos_count_daily.py -n 10
-
-# 日付の新しい順に表示
-uv run python photos_count_daily.py -s date -r
-
-# RAW 画像のみを集計してカスタムライブラリから読み込む
-uv run python photos_count_daily.py --raw-only --library /path/to/Photos.photoslibrary
-
-# EXIF 元日付でグループ化（Photos.app で撮影日を編集した写真がある場合）
-uv run python photos_count_daily.py --date-field date_original
+cd PhotoCensus && xcodegen generate && cd ..
+xcodebuild -project PhotoCensus/PhotoCensus.xcodeproj \
+  -scheme PhotoCensus -destination 'platform=macOS' build test
 ```
 
-## 出力形式
+実行: `open build/Build/Products/Debug/PhotoCensus.app`
+（`-derivedDataPath build` でビルドした場合）
 
-```text
-Date          Count       Size
-------------------------------
-2024-12-15       45     2.1 GB
-2024-12-14       32   980.5 MB
-...
-------------------------------
-Total: XXXX photos, ZZZ GB across YYY days
-```
+## アーキテクチャ
 
-- 結果（テーブル）は **stdout** に出力（パイプ処理に対応）
-- ステータス・デバッグメッセージは **stderr** に出力
+- `Models.swift` — `AssetRecord`（PhotoKit 資産の純粋データ表現）、`DailyStat`、`AggregationResult`
+- `PhotoLibraryService.swift` — PhotoKit アクセス層。`PHAsset` → `AssetRecord` 変換。
+  ファイルサイズは `PHAssetResource` の `fileSize`（KVC、非公開キー）から取得。
+  RAW 判定はリソース UTI が `public.camera-raw-image` に適合するか
+- `DailyAggregator.swift` — 集計・ソートの純粋関数。ユニットテストの主対象
+- `LibraryStatsViewModel.swift` — `@Observable`。読み込み状態・フィルタ（`MediaFilter`:
+  all / photosOnly / rawOnly の単一ドロップダウン）・ソートを保持
+- `Views/` — `ContentView`（切り替え・ツールバー）、`StatsTableView`、`ChartView`、
+  `SlidingSegmentedControl`（Table/Chart・Count/Size 切替用のカスタムアニメーション
+  付きスライドコントロール）、`DayDetailView`（テーブル行またはグラフの棒クリックで
+  開く日別サムネイルグリッド）、`AccessDeniedView`
 
 ## 実装上のポイント
 
-- **バースト写真**: `photos()` は BURST_KEY（キー写真）、BURST_SELECTED（ユーザー選択）、および burstPickType が BURST_PICK_TYPE_NONE の写真を返す。未レビューバーストの自動選択写真（BURST_DEFAULT_PICK）は osxphotos の公開 API では取得できないため既知の制限として残る
-- **ライブラリビュー非表示の写真の除外**: Photos の DB にはライブラリビューに表示されない写真も含まれるため、以下を除外する
-  - hidden 写真
-  - 共有アルバム（iCloud shared album）の写真（`shared`）
-  - 「あなたと共有」でライブラリ未保存の写真（`syndicated` かつ `saved_to_library` でない）
-- **RAW 判定**: `--raw-only` は `israw`（RAW 単体）または `has_raw`（RAW+JPEG ペア）で判定する。`has_raw` だけでは RAW 単体ファイルが漏れるので注意
-- **日付フィールド**: `--date-field` オプションで `date`（デフォルト）/ `date_original` / `date_added` を選択可能
-- **日付不明**: `None` の場合は `"Unknown"` として集計し、ソート時は末尾に表示
-- **容量**: `original_filesize`（オリジナルファイルのサイズ）を日付ごとに合計。DB のメタデータ由来なので iCloud 未ダウンロードでも取得できる。RAW+JPEG ペアの RAW 分は DB に記録がないため `path_raw` のファイル実体から加算する（未ダウンロードの場合は加算できず、件数を stderr に警告）。編集後の派生ファイルは含まない。表示は 10進単位（KB=1000B、Finder と同じ）
+- テストターゲットは TEST_HOST なし（アプリ起動で TCC ダイアログが出るのを避ける）。
+  ロジックファイルを直接テストターゲットのソースに含めている（`project.yml` 参照)
+- XcodeGen の `sources` に `optional: true` を付けてもファイル参照自体は
+  `.xcodeproj` に残るため、「ファイルが存在しなくてもビルドが通る」ようにはならない。
+  テストターゲットのソースとして指定したファイルは実在している必要がある
+- 集計対象は `includeAssetSourceTypes = [.typeUserLibrary]` でライブラリビュー相当に限定。
+  hidden・共有アルバム・未保存の「あなたと共有」は PhotoKit 側で除外される
+- サイズは `.photo` / `.video` / `.alternatePhoto`（RAW+JPEG の RAW 側）リソースの合計。
+  編集派生ファイルは含めない。サイズ不明（iCloud 未ダウンロード等）は件数を集計して UI に注記
+- 日付グループ化はローカルタイムゾーン。写真ごとの撮影タイムゾーンは PhotoKit では取得不可
+  （旧 CLI との既知の差分。README の Known limitations 参照）
+- 日付不明は `"Unknown"`、ソート時は常に末尾
+- 容量表示は 10 進単位（KB=1000B、Finder と同じ）。`Formatters.sizeString` を使う
+- 読み込みは起動時の一度きりのスナップショット。読み込み中の進捗コールバックは
+  約 30Hz に間引いて UI に反映する（`PhotoLibraryService.loadRecords` 参照）。
+  アプリ実行中に Photos.app で追加・削除された写真はテーブル・グラフには反映されず、
+  再起動が必要（`DayDetailView` は都度ライブラリから取得するため、その場合テーブルの
+  件数とサムネイル数が食い違いうる）
+- チャート（`ChartView.swift`）: macOS の Swift Charts の `chartScrollableAxes` /
+  `chartXVisibleDomain` はマークを描画しないバグがあるため使用禁止。代わりに
+  `ScrollView` + 明示幅（1日あたり 12pt、バー幅 9pt）+ `NSScrollView` を
+  `NSViewRepresentable` 経由で直接観測（デバウンス付き）してスクロール位置を取得し、
+  可視範囲に応じて右端固定の y 軸を再スケール（アニメーション付き）している。
+  x 軸は年月ラベル
+- ホバー処理は `ChartInteractionOverlay` に隔離し、マウス移動のたびに数千本の
+  `BarMark` を再評価させないようにしている。ホバーで日付・件数・サイズのツール
+  チップを表示し、クリックでその日の `DayDetailView` を開く
 
-## 開発環境
+## リリース
 
-- Python 3.12+
-- パッケージマネージャー: `uv`
-- 主要依存ライブラリ: `osxphotos>=0.75.5`
+`git tag vX.Y.Z && git push origin vX.Y.Z` → GitHub Actions が
+ad-hoc 署名の dmg（`PhotoCensus-vX.Y.Z.dmg`）を Release に添付（無署名配布。
+README に Gatekeeper 回避手順あり）。
+Developer ID 署名 + notarization へ移行する場合は workflow に署名ステップを追加する。

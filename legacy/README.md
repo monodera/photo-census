@@ -1,5 +1,9 @@
 # photos-count-daily
 
+> **Note:** This is the legacy Python CLI. The repository now ships a native
+> macOS app, PhotoCensus — see the [top-level README](../README.md). The CLI
+> still works as documented below.
+
 A script that reads a macOS Photos library and counts the number of photos per day.
 
 [日本語版 README はこちら](README_ja.md)
@@ -14,8 +18,8 @@ A script that reads a macOS Photos library and counts the number of photos per d
 If `uv` is installed, you can run the script directly without `uv sync`:
 
 ```bash
-git clone https://github.com/monodera/photos-by-date.git
-cd photos-by-date
+git clone https://github.com/monodera/photo-census.git
+cd photo-census/legacy
 uv run photos_count_daily.py
 ```
 
