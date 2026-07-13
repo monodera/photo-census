@@ -1,11 +1,11 @@
-name: PhotosCountDaily
+name: PhotoCensus
 options:
   bundleIdPrefix: com.monodera
   deploymentTarget:
     macOS: "14.0"
   createIntermediateGroups: true
 targets:
-  PhotosCountDaily:
+  PhotoCensus:
     type: application
     platform: macOS
     sources:
@@ -20,10 +20,10 @@ targets:
         NSPhotoLibraryUsageDescription: "Reads your Photos library to count photos and total size per day."
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.monodera.PhotosCountDaily
+        PRODUCT_BUNDLE_IDENTIFIER: com.monodera.PhotoCensus
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Manual
-  PhotosCountDailyTests:
+  PhotoCensusTests:
     type: bundle.unit-test
     platform: macOS
     sources:
@@ -35,14 +35,14 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
 schemes:
-  PhotosCountDaily:
+  PhotoCensus:
     build:
       targets:
-        PhotosCountDaily: all
-        PhotosCountDailyTests: [test]
+        PhotoCensus: all
+        PhotoCensusTests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
-        - PhotosCountDailyTests
+        - PhotoCensusTests

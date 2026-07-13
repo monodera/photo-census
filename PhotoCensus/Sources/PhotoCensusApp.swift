@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct PhotosCountDailyApp: App {
+struct PhotoCensusApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
