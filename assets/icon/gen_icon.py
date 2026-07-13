@@ -20,7 +20,7 @@ random.seed(20260712)
 # Photo print geometry
 PRINT_W = 128
 PRINT_H = 102
-BORDER = 10          # white border of the print
+BORDER = 0           # white border of the print
 PITCH = 30           # vertical stacking pitch
 BASELINE = MARGIN + ICON - 132   # y of the bottom print's bottom edge
 
