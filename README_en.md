@@ -14,6 +14,15 @@ Built with SwiftUI + PhotoKit. Requires macOS 14 or later.
 
 [日本語版 README](README.md)
 
+<p align="center">
+  <img src="docs/screenshots/demo.gif" width="700" alt="PhotoCensus demo: switching between Table and Chart views, hover tooltip">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/table.png" width="49%" alt="Table view screenshot">
+  <img src="docs/screenshots/chart.png" width="49%" alt="Chart view with hover tooltip screenshot">
+</p>
+
 ## Features
 
 - Per-day photo count and total original file size (decimal units, same as Finder)

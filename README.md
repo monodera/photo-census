@@ -14,6 +14,15 @@ SwiftUI + PhotoKit で構築。macOS 14 以降が必要。
 
 [English README](README_en.md)
 
+<p align="center">
+  <img src="docs/screenshots/demo.gif" width="700" alt="PhotoCensus のデモ: テーブル表示とグラフ表示の切り替え、ホバーツールチップ">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/table.png" width="49%" alt="テーブル表示のスクリーンショット">
+  <img src="docs/screenshots/chart.png" width="49%" alt="グラフ表示（ホバーツールチップ）のスクリーンショット">
+</p>
+
 ## 機能
 
 - 日付ごとの写真枚数と合計オリジナルファイルサイズ（10 進単位、Finder と同じ）
