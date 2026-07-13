@@ -1,5 +1,7 @@
 # photos-count-daily
 
+> **注:** これはレガシーの Python CLI 版です。現在このリポジトリはネイティブ macOS アプリ **PhotoCensus** を提供しています — [トップレベルの README](../README_ja.md) を参照してください。CLI は以下のとおり引き続き動作します。
+
 macOS の Photos ライブラリを読み込み、日付ごとに写真枚数をカウントして表示するスクリプト。
 
 ## 必要環境
@@ -12,8 +14,8 @@ macOS の Photos ライブラリを読み込み、日付ごとに写真枚数を
 `uv` がインストールされていれば、`uv sync` 不要でそのまま実行できます。
 
 ```bash
-git clone https://github.com/monodera/photos-by-date.git
-cd photos-by-date
+git clone https://github.com/monodera/photo-census.git
+cd photo-census/legacy
 uv run photos_count_daily.py
 ```
 
