@@ -37,7 +37,10 @@ final class LibraryStatsViewModel {
         state = .loading(done: 0, total: 0)
         records = await PhotoLibraryService.loadRecords { done, total in
             Task { @MainActor [weak self] in
-                self?.state = .loading(done: done, total: total)
+                // 完了後に遅れて届いた進捗更新が .loaded を上書きしないようにする
+                if case .loading = self?.state {
+                    self?.state = .loading(done: done, total: total)
+                }
             }
         }
         recompute()

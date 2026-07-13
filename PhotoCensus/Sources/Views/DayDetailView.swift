@@ -34,12 +34,17 @@ struct DayDetailView: View {
         }
         .frame(minWidth: 560, minHeight: 420)
         .task {
-            assets = Self.fetchAssets(for: stat, photosOnly: photosOnly, rawOnly: rawOnly)
+            // RAW フィルタ時は資産ごとのリソース列挙が走るためメインスレッドから逃がす
+            let (stat, photosOnly, rawOnly) = (stat, photosOnly, rawOnly)
+            assets = await Task.detached(priority: .userInitiated) {
+                Self.fetchAssets(for: stat, photosOnly: photosOnly, rawOnly: rawOnly)
+            }.value
         }
     }
 
-    /// 集計と同じローカルタイムゾーン・同じフィルタ条件でその日の資産を取得する
-    static func fetchAssets(for stat: DailyStat, photosOnly: Bool, rawOnly: Bool) -> [PHAsset] {
+    /// 集計と同じローカルタイムゾーン・同じフィルタ条件でその日の資産を取得する。
+    /// バックグラウンドタスクから呼ぶため MainActor 分離を外している
+    nonisolated static func fetchAssets(for stat: DailyStat, photosOnly: Bool, rawOnly: Bool) -> [PHAsset] {
         guard let dayStart = stat.date else { return [] }
         let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: dayStart)!
 
@@ -77,6 +82,7 @@ struct AssetThumbnailView: View {
     let asset: PHAsset
 
     @State private var image: NSImage?
+    @State private var requestID: PHImageRequestID?
 
     private static let imageManager = PHCachingImageManager()
 
@@ -97,7 +103,7 @@ struct AssetThumbnailView: View {
             let options = PHImageRequestOptions()
             options.isNetworkAccessAllowed = true
             options.deliveryMode = .opportunistic
-            Self.imageManager.requestImage(
+            requestID = Self.imageManager.requestImage(
                 for: asset,
                 targetSize: CGSize(width: 240, height: 240),
                 contentMode: .aspectFill,
@@ -109,6 +115,12 @@ struct AssetThumbnailView: View {
                         image = result
                     }
                 }
+            }
+        }
+        .onDisappear {
+            if let requestID {
+                Self.imageManager.cancelImageRequest(requestID)
+                self.requestID = nil
             }
         }
     }

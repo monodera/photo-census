@@ -6,8 +6,8 @@ prints stacked at a strict pitch with tiny hand rotations, on a dusk gradient
 squircle, warm accents only inside the prints, tallest column earns the
 warmest light.
 """
-import math
 import random
+from pathlib import Path
 
 CANVAS = 1024
 # Apple macOS icon grid: 824x824 squircle centered, corner radius ~186
@@ -135,7 +135,6 @@ svg = f'''<svg width="{CANVAS}" height="{CANVAS}" viewBox="0 0 {CANVAS} {CANVAS}
 </svg>
 '''
 
-out = "/private/tmp/claude-501/-Users-monodera-tmp-photos-count-daily/9c81cdf6-2231-4f55-b0f5-5cc798c29a79/scratchpad/photocensus-icon.svg"
-with open(out, "w") as f:
-    f.write(svg)
+out = Path(__file__).resolve().parent / "photocensus-icon.svg"
+out.write_text(svg)
 print(f"wrote {out}")

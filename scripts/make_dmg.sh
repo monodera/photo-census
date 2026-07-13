@@ -15,7 +15,7 @@ xcodegen generate --spec PhotoCensus/project.yml --project PhotoCensus
 xcodebuild -project PhotoCensus/PhotoCensus.xcodeproj \
   -scheme PhotoCensus -configuration Release \
   -derivedDataPath "$BUILD_DIR" \
-  CODE_SIGN_IDENTITY=- build
+  CODE_SIGN_IDENTITY=- MARKETING_VERSION="${VERSION#v}" build
 
 codesign --force --deep --sign - "$APP"
 
