@@ -1,49 +1,106 @@
+import AppKit
 import Charts
 import SwiftUI
 
-private struct ChartScrollOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+/// NSScrollView のスクロール位置を（慣性スクロール含めて）デバウンス付きで通知する。
+/// PreferenceKey ベースの手法は macOS の ScrollView ではスクロール中に
+/// 更新が発火しないため、NSScrollView を直接観測する。
+private struct ScrollOffsetReader: NSViewRepresentable {
+    var onSettle: (CGFloat) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            if let scrollView = view.enclosingScrollView {
+                context.coordinator.observe(scrollView)
+            }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onSettle = onSettle
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onSettle: onSettle)
+    }
+
+    final class Coordinator {
+        var onSettle: (CGFloat) -> Void
+        private var token: NSObjectProtocol?
+        private var pending: DispatchWorkItem?
+        private weak var clipView: NSClipView?
+
+        init(onSettle: @escaping (CGFloat) -> Void) {
+            self.onSettle = onSettle
+        }
+
+        func observe(_ scrollView: NSScrollView) {
+            guard token == nil else { return }
+            let clip = scrollView.contentView
+            clipView = clip
+            clip.postsBoundsChangedNotifications = true
+            token = NotificationCenter.default.addObserver(
+                forName: NSView.boundsDidChangeNotification,
+                object: clip,
+                queue: .main
+            ) { [weak self] _ in
+                self?.scheduleReport()
+            }
+            report()
+        }
+
+        private func scheduleReport() {
+            pending?.cancel()
+            let item = DispatchWorkItem { [weak self] in self?.report() }
+            pending = item
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: item)
+        }
+
+        private func report() {
+            guard let clip = clipView else { return }
+            onSettle(clip.bounds.origin.x)
+        }
+
+        deinit {
+            pending?.cancel()
+            if let token {
+                NotificationCenter.default.removeObserver(token)
+            }
+        }
     }
 }
 
 struct ChartView: View {
-    var stats: [DailyStat]
-    @Binding var selectedDay: DailyStat?
+    @Binding private var selectedDay: DailyStat?
 
     @State private var metric: Metric = .count
     @State private var scrollOffset: CGFloat = 0
     @State private var viewportWidth: CGFloat = 0
-    @State private var hovered: HoverInfo?
+
+    /// Unknown（date == nil）を除外した日付昇順の統計と、日付 00:00 → 統計の逆引き。
+    /// body 評価のたびに再計算しないよう init で一度だけ作る
+    private let chartStats: [DailyStat]
+    private let statsByDay: [Date: DailyStat]
 
     enum Metric: String, CaseIterable {
         case count = "Count"
         case size = "Size"
     }
 
-    struct HoverInfo: Equatable {
-        var stat: DailyStat
-        var location: CGPoint
-    }
-
-    private let pointsPerDay: CGFloat = 6
+    private let pointsPerDay: CGFloat = 8
     private let axisWidth: CGFloat = 64
 
-    /// Unknown（date == nil）はグラフに出せないため除外し、日付昇順で描画する
-    private var chartStats: [DailyStat] {
-        stats.filter { $0.date != nil }.sorted { $0.day < $1.day }
-    }
-
-    /// ホバー・クリック時の日付→統計の逆引き（キーは各日の 00:00）
-    private var statsByDay: [Date: DailyStat] {
-        Dictionary(uniqueKeysWithValues: chartStats.compactMap { stat in
+    init(stats: [DailyStat], selectedDay: Binding<DailyStat?>) {
+        let filtered = stats.filter { $0.date != nil }.sorted { $0.day < $1.day }
+        chartStats = filtered
+        statsByDay = Dictionary(uniqueKeysWithValues: filtered.compactMap { stat in
             stat.date.map { ($0, stat) }
         })
+        _selectedDay = selectedDay
     }
 
-    /// 全期間を 1 日 6pt で描画する幅。macOS では chartScrollableAxes が
-    /// マークを描画しないため、ScrollView + 明示幅でスクロールを実現する
     private var chartWidth: CGFloat {
         guard let first = chartStats.first?.date, let last = chartStats.last?.date else {
             return 600
@@ -93,19 +150,12 @@ struct ChartView: View {
                         scrollingChart
                             .frame(width: chartWidth, height: geometry.size.height)
                             .background(
-                                GeometryReader { inner in
-                                    Color.clear.preference(
-                                        key: ChartScrollOffsetKey.self,
-                                        value: -inner.frame(in: .named("chartScroll")).minX
-                                    )
+                                ScrollOffsetReader { offset in
+                                    scrollOffset = offset
                                 }
                             )
                     }
-                    .coordinateSpace(name: "chartScroll")
                     .defaultScrollAnchor(.trailing)
-                    .onPreferenceChange(ChartScrollOffsetKey.self) { offset in
-                        scrollOffset = offset
-                    }
 
                     axisChart
                         .frame(width: axisWidth, height: geometry.size.height)
@@ -118,14 +168,14 @@ struct ChartView: View {
         }
     }
 
-    /// スクロールする本体。y 軸ラベルは出さずグリッド線のみ（ラベルは axisChart に固定表示）
+    /// スクロールする本体。y 軸ラベルは axisChart に固定表示するためグリッド線のみ
     private var scrollingChart: some View {
         Chart(chartStats) { stat in
             BarMark(
                 x: .value("Date", stat.date!, unit: .day),
-                y: .value(metric.rawValue, value(of: stat))
+                y: .value(metric.rawValue, value(of: stat)),
+                width: .fixed(6)
             )
-            .opacity(hovered?.stat.id == stat.id ? 1.0 : 0.75)
         }
         .chartYScale(domain: 0...visibleYMax)
         .chartYAxis {
@@ -134,27 +184,12 @@ struct ChartView: View {
             }
         }
         .chartOverlay { proxy in
-            GeometryReader { geo in
-                Rectangle()
-                    .fill(Color.clear)
-                    .contentShape(Rectangle())
-                    .onContinuousHover { phase in
-                        switch phase {
-                        case .active(let location):
-                            hovered = hoverInfo(at: location, proxy: proxy, geo: geo)
-                        case .ended:
-                            hovered = nil
-                        }
-                    }
-                    .onTapGesture { location in
-                        if let info = hoverInfo(at: location, proxy: proxy, geo: geo) {
-                            selectedDay = info.stat
-                        }
-                    }
-            }
-        }
-        .overlay(alignment: .topLeading) {
-            tooltip
+            ChartInteractionOverlay(
+                statsByDay: statsByDay,
+                chartWidth: chartWidth,
+                proxy: proxy,
+                selectedDay: $selectedDay
+            )
         }
     }
 
@@ -179,6 +214,46 @@ struct ChartView: View {
             }
         }
     }
+}
+
+/// ホバー・クリックの処理とツールチップ描画。hover 状態をこのビューに閉じ込め、
+/// マウス移動のたびに数千本の BarMark を再評価しないようにする
+private struct ChartInteractionOverlay: View {
+    let statsByDay: [Date: DailyStat]
+    let chartWidth: CGFloat
+    let proxy: ChartProxy
+    @Binding var selectedDay: DailyStat?
+
+    @State private var hovered: HoverInfo?
+
+    struct HoverInfo: Equatable {
+        var stat: DailyStat
+        var location: CGPoint
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            Rectangle()
+                .fill(Color.clear)
+                .contentShape(Rectangle())
+                .onContinuousHover { phase in
+                    switch phase {
+                    case .active(let location):
+                        hovered = hoverInfo(at: location, geo: geo)
+                    case .ended:
+                        hovered = nil
+                    }
+                }
+                .onTapGesture { location in
+                    if let info = hoverInfo(at: location, geo: geo) {
+                        selectedDay = info.stat
+                    }
+                }
+                .overlay(alignment: .topLeading) {
+                    tooltip
+                }
+        }
+    }
 
     @ViewBuilder private var tooltip: some View {
         if let hovered {
@@ -200,7 +275,7 @@ struct ChartView: View {
         }
     }
 
-    private func hoverInfo(at location: CGPoint, proxy: ChartProxy, geo: GeometryProxy) -> HoverInfo? {
+    private func hoverInfo(at location: CGPoint, geo: GeometryProxy) -> HoverInfo? {
         guard let plotFrame = proxy.plotFrame else { return nil }
         let origin = geo[plotFrame].origin
         let x = location.x - origin.x
