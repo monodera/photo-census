@@ -60,12 +60,9 @@ struct ContentView: View {
                     }
                 }
                 .pickerStyle(.menu)
-                Picker("Display", selection: $display) {
-                    ForEach(DisplayMode.allCases, id: \.self) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
+                SlidingSegmentedControl(options: DisplayMode.allCases, selection: $display) { mode in
+                    mode.rawValue
                 }
-                .pickerStyle(.segmented)
             }
         }
         .sheet(item: $selectedDay, onDismiss: { tableSelection = nil }) { day in

@@ -135,13 +135,9 @@ struct ChartView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Picker("Metric", selection: $metric) {
-                ForEach(Metric.allCases, id: \.self) { metric in
-                    Text(metric.rawValue).tag(metric)
-                }
+            SlidingSegmentedControl(options: Metric.allCases, selection: $metric) { metric in
+                metric.rawValue
             }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 240)
             .padding(.top, 8)
 
             GeometryReader { geometry in
